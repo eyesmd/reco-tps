@@ -1,0 +1,33 @@
+abc   adg   ABC
+def * beh = BDE
+ghi   cfi   CEF
+
+Det:
+F*det(AB  - E*det(AC  + C*det(BC
+              BD)                 BE)                   DE)
+
+F*(AD-BB) - E*(AE-CB) + C*(BE-CD)
+
+Supposing diagonally dominant...
+
+F*(AD-BB)
+ >= (C+E)*((B+C)(B+E)-BB)
+ = (C+E)*(CB+BE+CE)
+
+E*(AE-CB)
+ >= E*((B+C)E - CB)
+ = E*(BE+CE-CB)
+
+C*(BE-CD)
+ >= C*(BE-C(B+E))
+ = C*(BE-CB-CE)
+
+Then...
+
+F*(AD-BB) - E*(AE-CB) + C*(BE-CD) 
+ >= (C+E)*(CB+BE+CE) - E*(BE+CE-CB) +  C*(BE-CB-CE)
+ = (C+E)*(CB+BE+CE) - BEE - CEE + BCE  + BCE - BCC - CCE
+ = CCB + BCE + CCE + BCE + BEE + CEE - BEE - CEE + BCE  + BCE - BCC - CCE
+ = BCE + BCE + BCE  + BCE
+ = 4*BCE
+ > 0
