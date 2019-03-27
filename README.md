@@ -29,3 +29,28 @@ pkg load io
 pkg load statistics
 pkg load image
 ```
+
+### Python
+
+Se puede instalar de mil maneras. Instalar pip también, y bajarse las dependencias de python con:
+```
+pip3 install numpy
+pip3 install pandas
+pip3 install matplotlib
+```
+
+
+### Jupyter Notebook
+
+Para instalar jupyter, basta con usar pip. Los notebooks tienen bloques de código en Octave, con lo cual también hay que bajarse un kernel de Octave para poder ejecutarlos.
+
+```
+pip3 install --upgrade pip
+pip3 install octave_kernel
+```
+
+Para correr jupyter, en un directorio con notebooks correr:
+```
+jupyter notebook
+```
+
