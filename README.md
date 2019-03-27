@@ -46,6 +46,7 @@ Para instalar jupyter, basta con usar pip. Los notebooks tienen bloques de códi
 
 ```
 pip3 install --upgrade pip
+pip3 install jupyter
 pip3 install octave_kernel
 ```
 
