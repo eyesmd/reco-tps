@@ -49,7 +49,7 @@ mu = 0
 sigma = 1
 
 mu_0 = 0
-sigma_0 = 0.1
+sigma_0 = 10000
 
 fig, axes = plt.subplots(2, 2, sharex=True)
 axes = axes.flatten()
