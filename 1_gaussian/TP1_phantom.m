@@ -1,174 +1,147 @@
-%PREÁMBULO+++++++++++++++++++
-% En el ejercicio se plantea lo siguiente:
+
+%PREAMBULO+++++++++++++++++++
 % Tengo un imagen dividida en 6 regiones. Voy a imaginar que en cada region
-% ocurre un proceso distinto que genera por cada pixel un evento distinto.
-% La información que nos interesa de dichos eventos va a ser un vector de
-% 3 dimensiones, que lo vamos a pensar como un color.
-% El proceso de cada región va a tener una distribución gaussiana trivariada
-% cuyos parámetros vamos a elegir según con lo que requiere el enunciado
-% experimentar. Para cada set de parámetros vamos a generar una muestra por
-% cada pixel, y vamos a intentar clasificar de manera naive (ya que contamos
-% con la información de las distribuciones).
-% La idea va a ser sacar conclusiones con los resultados de la clasificaciones
-% utilizando las densidades producto de los diversos sets de parámetros.
-
-% En principio, ¿no es raro que lo que estemos variando son las densidades
-% reales? Lo que tendría más sentido variar es nuestra manera de
-% clasificar... Tipo, no sé que tanto sentido tenga preguntarse qué
-% distribución tendría que tener nuestros fenómenos para conseguir buenos
-% resultados en la clasificación.
-% En general, mientras menos varianza mejor, pues las nubes de puntos
-% de las distintas clases estarán separadas. Por decir algo, preferiríamos
-% modelos con los parámetros del B más que los del A, pues tenemos más
-% información sobre cada feature; y más los del C que los del B pues la
-% info de cada clase tendría mayor chance de ser más compacta (salchicha
-% vs esfera so to say).
-
-% - ¿Densidades marginales de vector aleatorio con distribucion gaussiana
-% multivariada, donde las componentes no son independientes?
-% https://stats.stackexchange.com/questions/51171/obtaining-marginal-distributions-from-the-bivariate-normal
-
+% ocurre un proceso que genera una color por cada pixel.
 
 clc; clear;
-COLORS = int16([123 239 134; 126 123 239;  80 147  53;
+phantom = double(imread('phantom.png'));
+
+
+
+% PARSEO DE VERDAD TERRESTRE +++++++++++++++++ 
+
+printf('Extrayendo las verdaderas clases de cada pixel...\n\n');
+
+global COLORS = double([123 239 134; 126 123 239;  80 147  53;
                 201 199  60; 188 152  81; 239 124  67]);
 
-%CLASIFICACIÓN (con verdad terrestre) +++++++++++++++++ 
-% Para obtener las verdaderas clases tomé los 6 colores principales de la
-% imagen phantom para obtener 6 clases. Cada pixel es asignado a su clase
-% según qué color tenga más cerca.
-fprintf('Extrayendo las verdaderas clases de cada pixel...\n\n');
-v_clases = zeros(400, 640, 'uint8');
-phantom = imread('phantom.png');
-for i = 1:400
-  for j = 1:640
-    pixel = int16(reshape((phantom(i,j,:)), [1 3]));
-    min_d = sum(abs(pixel - COLORS(1,:)));
-    min_c = 1;
-    for h = 2:6
-      distance = sum(abs(pixel - COLORS(h,:)));
-      if distance < min_d
-        min_d = distance;
-        min_c = h;
-      end
-    end
-    v_clases(i,j) = min_c;
-  end
+function ret = squared_distances_to(matrix, point)
+  r_difference = abs(matrix(:,:,1) .- point(1)); % broadcast
+  g_difference = abs(matrix(:,:,2) .- point(2)); % broadcast
+  b_difference = abs(matrix(:,:,3) .- point(3)); % broadcast
+  ret = r_difference .^2 + g_difference .^2 + b_difference .^2;
+endfunction
+
+%function ret = minimum(a, b)
+  %ret = merge(a < b, a, b);                              (merge)
+  %cond = a < b; ret = cond .* a + not(cond) .* b         (mask)
+  %cond = a < b; a(!cond) = 0; b(cond) = 0; ret = a + b   (indexing)
+%endfunction
+
+classes = zeros(400, 640, 'uint8');
+min_squared_distances = inf(400, 640);
+for c = 1:6
+  squared_distances = squared_distances_to(phantom, COLORS(c,:));
+  is_minimum = squared_distances < min_squared_distances;
+  classes(is_minimum) = c;
+  min_squared_distances = min(min_squared_distances, squared_distances);
 end
-            
-for t = 1:3
-  if t == 1
-    fprintf('CASO MATRICES ISÓTROPICAS E IGUALES ENTRE SI\n');
-  elseif t == 2
-    fprintf('CASO MATRICES DIAGONALES\n');
-  elseif t == 3
-    fprintf('CASO MATRICES ARBITRARIAS\n');
-  end
-  
-  %GENERACIÓN++++++++++++++++++
-  %Parámetros
-  fprintf('Asignando los parámetros a las densidades de clase...\n');
-  mus = double(COLORS);
+
+clear c, squared_distances is_minimum min_squared_distances;
+
+
+
+% GENERACIÃ“N DE PARÃMETROS ++++++++++++++++++
+
+printf('Asignando los parÃ¡metros a las densidades de clase...\n');
+
+function sigmas = iso_generate_sigmas()
+  global COLORS;
   sigmas = zeros(3, 3, 6);
-  if t == 1 %Equal isotropic
-    var = rand(1) * 80 + 200;
-    temp = eye(3) * var;
-    for i = 1:6
-      sigmas(:,:,i) = temp;
-    end
-    %Sample Example
-    %126.4184    0.          0.
-    %  0.      126.4184      0.
-    %  0.        0.        126.4184
-
-  elseif t == 2 %Unequal diagonal
-    for i = 1:6
-      vars = rand(1,3) * 80 + 80;
-      temp = [vars(1) 0 0 ; 0 vars(2) 0; 0 0 vars(3)];
-      sigmas(:,:,i) = temp;
-    end
-    %Sample Example
-    %137.7529     0.         0.
-    %  0.       115.7590     0.
-    %  0.         0.        90.8845
-
-  elseif t == 3 %Any
-    for i = 1:6
-      temp = rand(3)/2 + 0.5; %matriz aleatoria
-      temp = (temp * temp') + 3 * eye(3);  %definida positiva
-      temp = temp * 30; %aumento la proba de que haya variación y correlación
-       % multiplicar por escalar escala el det. La suma no sé en realidad,
-      sigmas(:,:,i) = temp;
-    end
-    %Sample Example
-    %162.2787    54.1064    62.3708
-    % 54.1064   131.1191    48.5776
-    % 62.3708    48.5776   149.6149
+  var = rand(1) * 80 + 200;
+  temp = eye(3) * var;
+  for i = 1:6
+    sigmas(:,:,i) = temp;
   end
-      
-  %Muestreo
-  fprintf('Muestreando...\n');
-  values = zeros(400, 640, 3);
-  for h = 1:6
-    v = find(v_clases == h);
-    for i = 1:length(v)
-      k = v(i);
-      muestra = mvnrnd(mus(h,:),sigmas(:,:,h));
-      values(k) = muestra(1); % Asigno de esta forma porque me falta matlab
-      values(k+256000) = muestra(2);
-      values(k+512000) = muestra(3);
-    end
-  end
+endfunction
 
-  %CLASIFICACIÓN+++++++++++++
-  %Clasificación
-  %Como el priori es equiprobable para cada clase, lo ignoro en las funciones
-  %discriminantes y computo solo el likelihood.
-  fprintf('Clasificando...\n');
-  clases = zeros(400, 640, 'uint8');
+function sigmas = diag_generate_sigmas()
+  sigmas = zeros(3, 3, 6);
+  for i = 1:6
+    vars = rand(1,3) * 80 + 80;
+    temp = [vars(1) 0 0 ; 0 vars(2) 0; 0 0 vars(3)];
+    sigmas(:,:,i) = temp;
+  end
+endfunction
+
+function sigmas = arb_generate_sigmas()
+  for i = 1:6
+    sigmas = zeros(3, 3, 6);
+    temp = rand(3)/2 + 0.5; % matriz aleatoria
+    temp = (temp * temp') + 3 * eye(3);  % definida positiva
+    temp = temp * 30; % aumento la proba de que haya variaciÃ³n y correlacion
+    sigmas(:,:,i) = temp;
+  end
+endfunction
+
+mus = COLORS;
+iso_sigmas = iso_generate_sigmas();
+diag_sigmas = diag_generate_sigmas();
+arb_sigmas = arb_generate_sigmas();
+
+
+
+% MUESTREO ++++++++++++++++++
+
+printf('Muestreando...\n');
+
+function ret = sample(classes, mus, sigmas)
+  ret = zeros(400, 640, 3);
+  for c = 1:6
+    indexes = find(classes == c);
+    samples = mvnrnd(mus(c,:), sigmas(:,:,c), length(indexes));
+    ret(indexes) = samples(:,1);             % red
+    ret(indexes + 400*640) = samples(:,2);   % green
+    ret(indexes + 400*640*2) = samples(:,3); % blue
+  end
+endfunction
+
+iso_samples = sample(classes, mus, iso_sigmas);
+diag_samples = sample(classes, mus, diag_sigmas);
+arb_samples = sample(classes, mus, arb_sigmas);
+
+
+
+% CLASIFICACIÃ“N ++++++++++++++++++
+
+printf('Clasificando...\n');
+
+function ret = classify(linear_samples, mus, sigmas)
+  ret = zeros(400, 640, 'uint8');
+  max_likelihoods = zeros(400, 640);
+  for c = 1:6
+    likelihoods = reshape(mvnpdf(linear_samples, mus(c,:), sigmas(:,:,c)), [400 640]);
+    is_maximum = likelihoods > max_likelihoods
+    ret(is_maximum) = c;
+    max_likelihoods = max(likelihoods, max_likelihoods);
+  end
+endfunction
+
+linear_samples = reshape(samples, [400*640 3]);
+iso_classifications = classify(linear_samples, mus, iso_sigmas);
+diag_classifications = classify(linear_samples, mus, diag_sigmas);
+arb_classifications = classify(linear_samples, mus, arb_sigmas);
+
+
+% ANÃLISIS ++++++++++++++++++++++
+
+printf('Preparando funciones de anÃ¡lisis...\n');
+
+function picture(matrix)
+  if length(size(matrix)) == 3
+    image(uint8(matrix))
+  else
+    imshow(matrix, [1 1 1; 1 0 0 ; 0 1 0 ; 0 0 1 ; 1 1 0 ; 1 0 1 ; 0 1 1]);
+  end
+endfunction
+
+function ret = confusion(real, estimations)
+  ret = zeros(6,6,'uint32');
   for i = 1:400
     for j = 1:640
-      pixel = reshape(values(i,j,:), [1 3]);
-      max_c = 1;
-      max_l = mvnpdf(pixel, mus(1,:), sigmas(:,:,1));
-      for h = 2:6
-        likelihood = mvnpdf(pixel, mus(h,:), sigmas(:,:,h));
-        if likelihood > max_l
-          max_l = likelihood;
-          max_c = h;
-        end
-      end
-      clases(i,j) = max_c;
+      ret(real(i,j), estimations(i,j)) += 1;
     end
   end
+endfunction
 
-
-  %ANÁLISIS+++++++++++++++++
-  %Gráficos
-  figure(t);
-  imshow(clases, [1 1 1; 1 0 0 ; 0 1 0 ; 0 0 1 ; 1 1 0 ; 1 0 1 ; 0 1 1]);
-
-  %Matriz de confusión
-  fprintf('Calculando la matriz de confusión...\n');
-  confusion = zeros(6,6);
-  for i = 1:400
-    for j = 1:640
-      confusion(v_clases(i,j),clases(i,j)) = confusion(v_clases(i,j),clases(i,j)) + 1;
-    end
-  end
-  disp(confusion);
-  
-  fprintf('\n');
-end
-
-%LIMPIEZA+++++++++++++++++
-clear COLORS; clear h;
-clear t;
-clear i; clear j;
-clear v; clear k;
-clear var; clear vars;
-clear likelihood; clear max_l; clear max_c;
-clear distance; clear min_c; clear min_d;
-clear pixel; clear muestra; clear temp;
-
-fprintf('\nFin.\n');
+printf('Â¡Todo listo!\n');
